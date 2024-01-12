@@ -1,9 +1,12 @@
 package core.em;
 
 import core.ResultSetMapper;
+import core.dataSource.PoolDataSource;
 import core.exception.CreateNewInstanceException;
 import core.exception.ExecuteQueryException;
 import core.query.SqlQueryBuilder;
+import lombok.Getter;
+import lombok.Setter;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -13,14 +16,28 @@ import java.sql.SQLException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public abstract class DefaultEntityManager implements EntityManager {
+public abstract class DefaultEntityManager extends PoolDataSource implements EntityManager {
 
-    private final DataSource dataSource;
+    @Getter
+    @Setter
+    private DataSource dataSource;
 
     private final Map<EntityKey<?>, Object> cache = new ConcurrentHashMap<>();
 
     protected DefaultEntityManager(Properties property) {
-        this.dataSource = initDataSource(property);
+        super(property);
+    }
+
+    protected DefaultEntityManager(Properties property, int poolSize) {
+        super(property, poolSize);
+    }
+
+    @Override
+    public abstract void initDataSource(Properties property);
+
+    @Override
+    protected Connection getRealConnection() throws SQLException {
+        return getDataSource().getConnection();
     }
 
     public final <T> T find(Class<T> clazz, Long id) {
@@ -30,7 +47,7 @@ public abstract class DefaultEntityManager implements EntityManager {
     }
 
     private <T> T find(EntityKey<T> entityKey) {
-        try (Connection connection = dataSource.getConnection()) {
+        try (Connection connection = getConnection()) {
             try (PreparedStatement preparedStatement = connection
                     .prepareStatement(SqlQueryBuilder.getSelectQueryById(entityKey.clazz()))) {
                 preparedStatement.setObject(1, entityKey.id());
@@ -57,8 +74,4 @@ public abstract class DefaultEntityManager implements EntityManager {
             throw new CreateNewInstanceException("Fail create new instance from default constructor", exception);
         }
     }
-
-
-    @Override
-    public abstract DataSource initDataSource(Properties property);
 }
