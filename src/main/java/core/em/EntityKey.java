@@ -1,4 +1,4 @@
 package core.em;
 
-public record EntityKey(Class<?> clazz, Long id) {
+public record EntityKey<T>(Class<T> clazz, Long id) {
 }
